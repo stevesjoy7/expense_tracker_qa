@@ -1,4 +1,6 @@
-from fastapi import FastAPI, HTTPException
+import datetime
+
+from fastapi import FastAPI, HTTPException, Query
 from pydantic import BaseModel, Field
 
 app = FastAPI(title="Expense Tracker")
@@ -9,6 +11,7 @@ class Expense(BaseModel):
     title: str = Field(min_length=1)
     amount: float = Field(gt=0)
     category: str = Field(min_length=1)
+    date: datetime.date
 
 
 def _next_id():
@@ -56,3 +59,22 @@ def delete_expense(expense_id: int):
     record = _find(expense_id)
     expenses.remove(record)
     return {"message": "Expense deleted"}
+
+
+@app.get("/summary")
+def monthly_summary(
+    year: int = Query(ge=2000, le=2100),
+    month: int = Query(ge=1, le=12),
+):
+    by_category = {}
+    for e in expenses:
+        if e["date"].year == year and e["date"].month == month:
+            by_category[e["category"]] = by_category.get(
+                e["category"], 0) + e["amount"]
+    by_category = {k: round(v, 2) for k, v in by_category.items()}
+    return {
+        "year": year,
+        "month": month,
+        "total": round(sum(by_category.values()), 2),
+        "by_category": by_category,
+    }
